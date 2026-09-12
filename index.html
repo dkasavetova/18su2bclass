@@ -29,8 +29,15 @@ th{font-size:13px;color:var(--muted);background:#fafafa}
 .yes{color:var(--green);font-weight:700}.no{color:var(--muted)}
 .note{font-size:13px;color:var(--muted);margin-top:8px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
-@media(max-width:750px){.grid{grid-template-columns:repeat(2,1fr)}table{font-size:13px}th,td{padding:9px 7px}}
-@media(max-width:450px){.container{padding:12px}.grid{gap:8px}.card{padding:13px}.value{font-size:21px}h1{font-size:23px}}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:750px){table{font-size:13px}th,td{padding:9px 7px}}
+@media(max-width:450px){
+  .container{padding:12px}
+  .grid{gap:8px}
+  .card{padding:13px}
+  .value{font-size:21px}
+  h1{font-size:23px}
+}
 </style>
 </head>
 <body>
@@ -69,7 +76,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
 
 <div class="section card">
   <h2>📊 Обобщение</h2>
-  <div id="summary"></div>
+  <div id="summary">Зареждане на данни от Google Sheets…</div>
   <div class="note">Всички суми са в евро. Данните се зареждат от Google Sheets.</div>
 </div>
 
@@ -77,26 +84,19 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
 </div>
 
 <script>
-/*
-  GOOGLE SHEETS НАСТРОЙКА
-  -----------------------
-  Листове:
-    - Вноски (gid=1978905029)
-    - Разходи (gid=1799746150)
-
-  Файлът трябва да е: Anyone with the link can view.
-*/
-
-const DEMO_MODE = false;
-
+// === КОНФИГУРАЦИЯ ===
 const SHEET_ID = "1l_YKf6dAtY7aXTo76IuwTFENJ9LymvDm";
-
 const PAYMENTS_GID = "1978905029";
 const EXPENSES_GID = "1799746150";
 
 const PAYMENTS_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${PAYMENTS_GID}`;
 const EXPENSES_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${EXPENSES_GID}`;
 
+// Използваме CORS proxy
+const PROXY = "https://api.allorigins.win/raw?url=";
+// ====================
+
+// Примерни данни
 const demoPayments = [
   ["Мартина Граурова","65","Да","Да","12.09.2026"],
   ["Иван Петров","50","Не","Да","13.09.2026"],
@@ -110,8 +110,71 @@ const demoExpenses = [
   ["10.10.2026","Канцеларски материали","12"]
 ];
 
+let paymentsData = demoPayments;
+let expensesData = demoExpenses;
+
 function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).trim())}
 function euro(n){return Number(n||0).toFixed(2)+" €"}
+
+function getCell(row, index){
+  return (index < row.length) ? row[index] : "";
+}
+
+function render(){
+  const payments = paymentsData;
+  const expenses = expensesData;
+
+  const paid = payments.filter(r => isYes(getCell(r,3)));
+  const income = paid.reduce((s,r)=>s+(parseFloat(String(getCell(r,1)).replace(",", "."))||0),0);
+  const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(getCell(r,2)).replace(",", "."))||0),0);
+  const balance=income-expenseTotal;
+
+  document.getElementById("income").textContent=euro(income);
+  document.getElementById("expenses").textContent=euro(expenseTotal);
+  document.getElementById("balance").textContent=euro(balance);
+  document.getElementById("paidCount").textContent=paid.length+" / "+payments.length;
+
+  document.getElementById("payments").innerHTML=payments.map(r=>{
+    const дете = getCell(r,0);
+    const сума = getCell(r,1);
+    const дарение = getCell(r,2);
+    const платено = getCell(r,3);
+    const дата = getCell(r,4);
+
+    const p = isYes(платено);
+    return `<tr>
+      <td>${escapeHtml(дете)}</td>
+      <td>${euro(parseFloat(String(сума).replace(",","."))||0)}</td>
+      <td>${isYes(дарение)?'<span class="yes">Да</span>':'<span class="no">Не</span>'}</td>
+      <td><span class="badge ${p?'paid':'unpaid'}">${p?'Платено':'Неплатено'}</span></td>
+      <td>${escapeHtml(дата||"—")}</td>
+    </tr>`
+  }).join("");
+
+  document.getElementById("expensesTable").innerHTML=expenses.map(r=>{
+    const дата = getCell(r,0);
+    const разход = getCell(r,1);
+    const сума = getCell(r,2);
+    return `<tr>
+      <td>${escapeHtml(дата||"—")}</td>
+      <td>${escapeHtml(разход)}</td>
+      <td>${euro(parseFloat(String(сума).replace(",","."))||0)}</td>
+    </tr>`
+  }).join("");
+
+  document.getElementById("summary").innerHTML=
+    `<p>👥 Общо деца: <b>${payments.length}</b></p>
+     <p>✅ Платили: <b>${paid.length}</b></p>
+     <p>⏳ Неплатили: <b>${payments.length-paid.length}</b></p>
+     <p>💝 С включено дарение: <b>${paid.filter(r=>isYes(getCell(r,2))).length}</b></p>
+     <p>💰 Наличност: <b>${euro(balance)}</b></p>`;
+
+  document.getElementById("updated").textContent = new Date().toLocaleString("bg-BG");
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
 
 function parseCSV(text){
   const rows=[]; let row=[], cell="", quote=false;
@@ -136,83 +199,36 @@ function parseCSV(text){
   return rows;
 }
 
-function render(payments, expenses){
-  const paid = payments.filter(r=>isYes(r[3]));
-  const income = paid.reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",", "."))||0),0);
-  const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(r[2]).replace(",", "."))||0),0);
-  const balance=income-expenseTotal;
-
-  document.getElementById("income").textContent=euro(income);
-  document.getElementById("expenses").textContent=euro(expenseTotal);
-  document.getElementById("balance").textContent=euro(balance);
-  document.getElementById("paidCount").textContent=paid.length+" / "+payments.length;
-
-  document.getElementById("payments").innerHTML=payments.map(r=>{
-    const p=isYes(r[3]);
-    return `<tr>
-      <td>${escapeHtml(r[0]||"")}</td>
-      <td>${euro(parseFloat(String(r[1]).replace(",","."))||0)}</td>
-      <td>${isYes(r[2])?'<span class="yes">Да</span>':'<span class="no">Не</span>'}</td>
-      <td><span class="badge ${p?'paid':'unpaid'}">${p?'Платено':'Неплатено'}</span></td>
-      <td>${escapeHtml(r[4]||"—")}</td>
-    </tr>`
-  }).join("");
-
-  document.getElementById("expensesTable").innerHTML=expenses.map(r=>`<tr>
-    <td>${escapeHtml(r[0]||"")}</td><td>${escapeHtml(r[1]||"")}</td>
-    <td>${euro(parseFloat(String(r[2]).replace(",","."))||0)}</td>
-  </tr>`).join("");
-
-  const donation=paid.filter(r=>isYes(r[2])).reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",","."))||0)-50,0);
-  document.getElementById("summary").innerHTML=
-    `<p>👥 Общо деца: <b>${payments.length}</b></p>
-     <p>✅ Платили: <b>${paid.length}</b></p>
-     <p>⏳ Неплатили: <b>${payments.length-paid.length}</b></p>
-     <p>💝 С включено дарение: <b>${paid.filter(r=>isYes(r[2])).length}</b></p>
-     <p>💰 Наличност: <b>${euro(balance)}</b></p>`;
-  document.getElementById("updated").textContent=new Date().toLocaleString("bg-BG");
-}
-
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-}
-
-async function load(){
-  if(DEMO_MODE){
-    render(demoPayments, demoExpenses);
-    return;
-  }
+async function loadFromGoogle(){
   try{
     const [pText, eText] = await Promise.all([
-      fetch(PAYMENTS_CSV_URL).then(r => {
-        if(!r.ok) throw new Error("Вноски: HTTP " + r.status);
-        return r.text();
-      }),
-      fetch(EXPENSES_CSV_URL).then(r => {
-        if(!r.ok) throw new Error("Разходи: HTTP " + r.status);
-        return r.text();
-      })
+      fetch(PROXY + encodeURIComponent(PAYMENTS_CSV_URL)).then(r => r.text()),
+      fetch(PROXY + encodeURIComponent(EXPENSES_CSV_URL)).then(r => r.text())
     ]);
 
-    const pRows = parseCSV(pText);
-    const eRows = parseCSV(eText);
+    let pRows = parseCSV(pText);
+    let eRows = parseCSV(eText);
 
-    // Премахваме заглавния ред (първия ред)
-    const payments = pRows.slice(1);
-    const expenses = eRows.slice(1);
+    if(pRows.length>0 && /дете|сума|дарение|платено|дата/i.test(pRows[0].join(" "))){
+      pRows = pRows.slice(1);
+    }
+    if(eRows.length>0 && /дата|разход|сума/i.test(eRows[0].join(" "))){
+      eRows = eRows.slice(1);
+    }
 
-    render(payments, expenses);
+    if(pRows.length > 0) paymentsData = pRows;
+    if(eRows.length > 0) expensesData = eRows;
+
+    render();
   }catch(err){
-    document.getElementById("summary").innerHTML=
-      "<b>Неуспешно зареждане на данните.</b><br>" +
-      "Провери:<br>" +
-      "1) Дали файлът е достъпен с линк (Anyone with the link can view).<br>" +
-      "2) Дали GID-овете са верни: Вноски=" + PAYMENTS_GID + ", Разходи=" + EXPENSES_GID + ".<br>" +
-      "3) Грешка: " + escapeHtml(String(err.message || err));
-    console.error(err);
+    console.warn("Грешка при зареждане:", err);
   }
 }
-load();
+
+// Показваме първо примерните
+render();
+// После зареждаме от Google
+loadFromGoogle();
 </script>
 </body>
 </html>
