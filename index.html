@@ -80,12 +80,15 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
 const PAYMENTS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_zaXIrcdTqmLpeTWq8edkbSmYyYNe0lJrroURAAujOCIiKuzd6Uere94hAozE1ZBF5RpE9LVvUlnK/pub?gid=0&single=true&output=csv";
 const EXPENSES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_zaXIrcdTqmLpeTWq8edkbSmYyYNe0lJrroURAAujOCIiKuzd6Uere94hAozE1ZBF5RpE9LVvUlnK/pub?gid=864724706&single=true&output=csv";
 
+const TOTAL_CHILDREN = 24; // ФИКСИРАН БРОЙ ДЕЦА В КЛАСА
+
 function euro(n){return Number(n||0).toFixed(2)+" €"}
 function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).trim())}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
 function parseCSV(text){
-  return text.trim().split('\n').map(line => 
+  return text.trim().split('
+').map(line => 
     line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
   );
 }
@@ -93,8 +96,6 @@ function parseCSV(text){
 let dataLoaded = false;
 
 function render(payments, expenses){
-  // НОВА СТРУКТУРА: Превод(0) | Сума(1) | Дарение(2) | Дата(3)
-  // ВСИЧКИ СА ПЛАТИЛИ:
   const income = payments.reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",", "."))||0),0);
   const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(r[2]).replace(",", "."))||0),0);
   const balance=income-expenseTotal;
@@ -102,7 +103,7 @@ function render(payments, expenses){
   document.getElementById("income").textContent=euro(income);
   document.getElementById("expenses").textContent=euro(expenseTotal);
   document.getElementById("balance").textContent=euro(balance);
-  document.getElementById("paidCount").textContent=payments.length+" / "+payments.length;
+  document.getElementById("paidCount").textContent=payments.length+" / "+TOTAL_CHILDREN;
 
   document.getElementById("payments").innerHTML=payments.map(r=>{
     return `<tr>
@@ -120,9 +121,12 @@ function render(payments, expenses){
   </tr>`).join("");
 
   const withDonation = payments.filter(r=>isYes(r[2])).length;
+  const remaining = TOTAL_CHILDREN - payments.length;
+  
   document.getElementById("summary").innerHTML=
     `<p>👥 Общо вноски: <b>${payments.length}</b></p>
-     <p>✅ Всички платили: <b>${payments.length}</b></p>
+     <p>✅ Платили: <b>${payments.length}</b> от ${TOTAL_CHILDREN}</p>
+     <p>⏳ Остават: <b>${remaining}</b></p>
      <p>💝 С дарение: <b>${withDonation}</b></p>
      <p>💰 Наличност: <b>${euro(balance)}</b></p>`;
   document.getElementById("updated").textContent=new Date().toLocaleString("bg-BG");
