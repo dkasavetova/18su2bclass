@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="bg">
 <head>
@@ -6,142 +5,176 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Каса на 2. клас</title>
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:#f5f6f8;color:#202124}
-.container{max-width:1000px;margin:auto;padding:20px}
-h1{color:#5b5bd6}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:16px}
-table{width:100%;border-collapse:collapse}
-th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}
-th{background:#f9fafb;font-weight:600}
-.value{font-size:24px;font-weight:700}
-.green{color:#18864b}
-.red{color:#c62828}
+:root{
+  --bg:#f5f6f8; --card:#fff; --text:#202124; --muted:#6b7280;
+  --accent:#5b5bd6; --green:#18864b; --red:#c62828; --border:#e5e7eb;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}
+.container{max-width:1050px;margin:auto;padding:22px}
+header{background:linear-gradient(135deg,#5b5bd6,#7777e8);color:white;border-radius:20px;padding:26px;margin-bottom:18px}
+h1{margin:0 0 6px;font-size:28px} header p{margin:0;opacity:.9}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 2px 8px #00000008}
+.label{font-size:13px;color:var(--muted);margin-bottom:8px}
+.value{font-size:25px;font-weight:700}
+.green{color:var(--green)} .red{color:var(--red)}
+.section{margin-top:18px}
+.section h2{font-size:20px;margin:0 0 12px}
+table{width:100%;border-collapse:collapse;background:white;border-radius:14px;overflow:hidden}
+th,td{padding:12px 10px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:13px;color:var(--muted);background:#fafafa}
+.badge{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.paid{background:#e7f7ee;color:var(--green)} .unpaid{background:#fdeaea;color:var(--red)}
+.yes{color:var(--green);font-weight:700}.no{color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
+@media(max-width:750px){.grid{grid-template-columns:repeat(2,1fr)}table{font-size:13px}th,td{padding:9px 7px}}
+@media(max-width:450px){.container{padding:12px}.grid{gap:8px}.card{padding:13px}.value{font-size:21px}h1{font-size:23px}}
 </style>
 </head>
 <body>
 <div class="container">
-<h1>💼 Каса на 2. клас</h1>
+<header>
+  <h1>💼 Каса на 2. клас</h1>
+  <p>Първи срок • учебна 2026/2027 г.</p>
+</header>
 
-<div class="card">
-  <h2>📊 Обобщение</h2>
-  <p>Събрани средства: <span id="income" class="value green">—</span></p>
-  <p>Разходи: <span id="expenses" class="value red">—</span></p>
-  <p>Наличност: <span id="balance" class="value">—</span></p>
-  <p>Платили: <span id="paidCount" class="value">—</span></p>
+<div class="grid">
+  <div class="card"><div class="label">Събрани средства</div><div id="income" class="value green">—</div></div>
+  <div class="card"><div class="label">Разходи</div><div id="expenses" class="value red">—</div></div>
+  <div class="card"><div class="label">Наличност</div><div id="balance" class="value">—</div></div>
+  <div class="card"><div class="label">Платили</div><div id="paidCount" class="value">—</div></div>
 </div>
 
-<div class="card">
+<div class="section card">
   <h2>👧👦 Вноски</h2>
+  <div style="overflow-x:auto">
   <table>
     <thead><tr><th>Дете</th><th>Сума</th><th>Дарение</th><th>Статус</th><th>Дата</th></tr></thead>
     <tbody id="payments"></tbody>
   </table>
+  </div>
 </div>
 
-<div class="card">
+<div class="section card">
   <h2>💸 Разходи</h2>
+  <div style="overflow-x:auto">
   <table>
     <thead><tr><th>Дата</th><th>Разход</th><th>Сума</th></tr></thead>
     <tbody id="expensesTable"></tbody>
   </table>
+  </div>
 </div>
 
-<div class="card">
-  <h2>📝 Статус</h2>
-  <p id="status">Зареждане...</p>
+<div class="section card">
+  <h2>📊 Обобщение</h2>
+  <div id="summary"></div>
+  <div class="note">Всички суми са в евро. Данните се зареждат от Google Sheets.</div>
 </div>
+
+<footer>Касиер: Диана Иванова • Последна актуализация: <span id="updated"></span></footer>
 </div>
 
 <script>
+// GOOGLE SHEETS ID ОТ ТВОЯ ЛИНК:
 const SHEET_ID = "1l_YKf6dAtY7aXTo76IuwTFENJ9LymvDm";
-const PAYMENTS_GID = "1978905029";
-const EXPENSES_GID = "1799746150";
 
-// CORS proxy за заобикаляне на ограничението
+// PROXY ЗА ЗАБИКАЛЯНЕ НА CORS:
 const PROXY = "https://api.allorigins.win/raw?url=";
 
-const PAYMENTS_CSV = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${PAYMENTS_GID}`);
-const EXPENSES_CSV = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${EXPENSES_GID}`);
+const PAYMENTS_CSV_URL = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Вноски`);
+const EXPENSES_CSV_URL = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Разходи`);
 
-function euro(n){return Number(n||0).toFixed(2)+" €"}
-function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).trim())}
+const demoPayments = [
+  ["Мартина Граурова","65","Да","Да","12.09.2026"],
+  ["Иван Петров","50","Не","Да","13.09.2026"],
+  ["Анна Иванова","65","Да","Не",""],
+  ["Георги Димов","50","Не","Не",""]
+];
+
+const demoExpenses = [
+  ["28.09.2026","Подарък за госпожата","50"],
+  ["05.10.2026","Театър","18"],
+  ["10.10.2026","Канцеларски материали","12"]
+];
 
 function parseCSV(text){
   const rows=[]; let row=[], cell="", quote=false;
   for(let i=0;i<text.length;i++){
     const c=text[i], n=text[i+1];
-    if(c==='"' && quote && n==='"'){cell+='"';i++;continue}
-    if(c==='"'){quote=!quote;continue}
-    if(c===',' && !quote){row.push(cell.trim());cell="";continue}
-    if((c==='
-'||c==='
-') && !quote){
-      if(c==='
-'&&n==='
-')i++;
+    if(c === '"' && quote && n === '"'){cell+='"';i++;continue}
+    if(c === '"'){quote=!quote;continue}
+    if(c === ',' && !quote){row.push(cell.trim());cell="";continue}
+    if((c === '\n' || c === '\r') && !quote){
+      if(c==='\r' && n==='\n') i++;
       row.push(cell.trim());cell="";
-      if(row.some(x=>x!==""))rows.push(row);
+      if(row.some(x=>x!=="")) rows.push(row);
       row=[];continue;
     }
     cell+=c;
   }
-  if(cell||row.length){row.push(cell.trim());if(row.some(x=>x!==""))rows.push(row)}
+  if(cell || row.length){row.push(cell.trim());if(row.some(x=>x!=="")) rows.push(row)}
   return rows;
+}
+
+function euro(n){return Number(n||0).toFixed(2)+" €"}
+function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).trim())}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+function render(payments, expenses){
+  const paid = payments.filter(r=>isYes(r[3]));
+  const income = paid.reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",", "."))||0),0);
+  const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(r[2]).replace(",", "."))||0),0);
+  const balance=income-expenseTotal;
+
+  document.getElementById("income").textContent=euro(income);
+  document.getElementById("expenses").textContent=euro(expenseTotal);
+  document.getElementById("balance").textContent=euro(balance);
+  document.getElementById("paidCount").textContent=paid.length+" / "+payments.length;
+
+  document.getElementById("payments").innerHTML=payments.map(r=>{
+    const p=isYes(r[3]);
+    return `<tr>
+      <td>${escapeHtml(r[0]||"")}</td>
+      <td>${euro(parseFloat(String(r[1]).replace(",","."))||0)}</td>
+      <td>${isYes(r[2])?'<span class="yes">Да</span>':'<span class="no">Не</span>'}</td>
+      <td><span class="badge ${p?'paid':'unpaid'}">${p?'Платено':'Неплатено'}</span></td>
+      <td>${escapeHtml(r[4]||"—")}</td>
+    </tr>`
+  }).join("");
+
+  document.getElementById("expensesTable").innerHTML=expenses.map(r=>`<tr>
+    <td>${escapeHtml(r[0]||"")}</td><td>${escapeHtml(r[1]||"")}</td>
+    <td>${euro(parseFloat(String(r[2]).replace(",","."))||0)}</td>
+  </tr>`).join("");
+
+  document.getElementById("summary").innerHTML=
+    `<p>👥 Общо деца: <b>${payments.length}</b></p>
+     <p>✅ Платили: <b>${paid.length}</b></p>
+     <p>⏳ Неплатили: <b>${payments.length-paid.length}</b></p>
+     <p>💝 С включено дарение: <b>${paid.filter(r=>isYes(r[2])).length}</b></p>
+     <p>💰 Наличност: <b>${euro(balance)}</b></p>`;
+  document.getElementById("updated").textContent=new Date().toLocaleString("bg-BG");
 }
 
 async function load(){
   try{
-    document.getElementById("status").textContent = "Зареждане на данни от Google Sheets...";
-    
-    const [pText, eText] = await Promise.all([
-      fetch(PAYMENTS_CSV).then(r=>{
-        if(!r.ok) throw new Error("HTTP " + r.status);
-        return r.text();
-      }),
-      fetch(EXPENSES_CSV).then(r=>{
-        if(!r.ok) throw new Error("HTTP " + r.status);
-        return r.text();
-      })
+    const [p,e]=await Promise.all([
+      fetch(PAYMENTS_CSV_URL).then(r=>r.text()),
+      fetch(EXPENSES_CSV_URL).then(r=>r.text())
     ]);
-    
-    let pRows = parseCSV(pText).slice(1);
-    let eRows = parseCSV(eText).slice(1);
-    
-    const paid = pRows.filter(r=>isYes(r[3]));
-    const income = paid.reduce((s,r)=>s+(parseFloat(r[1].replace(",","."))||0),0);
-    const expenseTotal = eRows.reduce((s,r)=>s+(parseFloat(r[2].replace(",","."))||0),0);
-    const balance = income - expenseTotal;
-    
-    document.getElementById("income").textContent = euro(income);
-    document.getElementById("expenses").textContent = euro(expenseTotal);
-    document.getElementById("balance").textContent = euro(balance);
-    document.getElementById("paidCount").textContent = paid.length + " / " + pRows.length;
-    
-    document.getElementById("payments").innerHTML = pRows.map(r=>`
-      <tr>
-        <td>${r[0]||""}</td>
-        <td>${euro(parseFloat(r[1].replace(",","."))||0)}</td>
-        <td>${isYes(r[2])?"✅ Да":"❌ Не"}</td>
-        <td>${isYes(r[3])?"🟢 Платено":"🔴 Неплатено"}</td>
-        <td>${r[4]||"—"}</td>
-      </tr>
-    `).join("");
-    
-    document.getElementById("expensesTable").innerHTML = eRows.map(r=>`
-      <tr>
-        <td>${r[0]||"—"}</td>
-        <td>${r[1]||""}</td>
-        <td>${euro(parseFloat(r[2].replace(",","."))||0)}</td>
-      </tr>
-    `).join("");
-    
-    document.getElementById("status").textContent = "✅ Данните са заредени успешно!";
+    const payments=parseCSV(p).slice(1);
+    const expenses=parseCSV(e).slice(1);
+    render(payments,expenses);
   }catch(err){
-    document.getElementById("status").textContent = "❌ Грешка: " + err.message;
     console.error(err);
+    document.getElementById("summary").innerHTML="<b>Грешка:</b> "+err.message+"<br><small>Провери конзолата (F12) за детайли.</small>";
   }
 }
-
 load();
 </script>
 </body>
