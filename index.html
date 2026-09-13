@@ -77,27 +77,17 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
 </div>
 
 <script>
-// GOOGLE SHEETS ID ОТ ТВОЯ ЛИНК:
 const SHEET_ID = "1l_YKf6dAtY7aXTo76IuwTFENJ9LymvDm";
 
-// PROXY ЗА ЗАБИКАЛЯНЕ НА CORS:
-const PROXY = "https://api.allorigins.win/raw?url=";
+// РАБОТЕЩ PROXY:
+const PROXY = "https://corsproxy.io/?";
 
 const PAYMENTS_CSV_URL = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Вноски`);
 const EXPENSES_CSV_URL = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Разходи`);
 
-const demoPayments = [
-  ["Мартина Граурова","65","Да","Да","12.09.2026"],
-  ["Иван Петров","50","Не","Да","13.09.2026"],
-  ["Анна Иванова","65","Да","Не",""],
-  ["Георги Димов","50","Не","Не",""]
-];
-
-const demoExpenses = [
-  ["28.09.2026","Подарък за госпожата","50"],
-  ["05.10.2026","Театър","18"],
-  ["10.10.2026","Канцеларски материали","12"]
-];
+function euro(n){return Number(n||0).toFixed(2)+" €"}
+function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).trim())}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
 function parseCSV(text){
   const rows=[]; let row=[], cell="", quote=false;
@@ -116,13 +106,6 @@ function parseCSV(text){
   }
   if(cell || row.length){row.push(cell.trim());if(row.some(x=>x!=="")) rows.push(row)}
   return rows;
-}
-
-function euro(n){return Number(n||0).toFixed(2)+" €"}
-function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).trim())}
-
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 }
 
 function render(payments, expenses){
@@ -172,7 +155,7 @@ async function load(){
     render(payments,expenses);
   }catch(err){
     console.error(err);
-    document.getElementById("summary").innerHTML="<b>Грешка:</b> "+err.message+"<br><small>Провери конзолата (F12) за детайли.</small>";
+    document.getElementById("summary").innerHTML="<b>Грешка:</b> "+err.message;
   }
 }
 load();
