@@ -87,8 +87,7 @@ function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).tr
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
 function parseCSV(text){
-  return text.trim().split('
-').map(line => 
+  return text.trim().split('/n').map(line => 
     line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
   );
 }
