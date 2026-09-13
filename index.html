@@ -77,14 +77,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
 </div>
 
 <script>
-const SHEET_ID = "1l_YKf6dAtY7aXTo76IuwTFENJ9LymvDm";
-
-// НОВ PROXY:
-const PROXY = "https://thingsproxy.com/?url=";
-
-const timestamp = Date.now();
-const PAYMENTS_CSV_URL = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Вноски&ts=${timestamp}`);
-const EXPENSES_CSV_URL = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Разходи&ts=${timestamp}`);
+// НОВИТЕ ЛИНКОВЕ:
+const PAYMENTS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_zaXIrcdTqmLpeTWq8edkbSmYyYNe0lJrroURAAujOCIiKuzd6Uere94hAozE1ZBF5RpE9LVvUlnK/pub?gid=0&single=true&output=csv";
+const EXPENSES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_zaXIrcdTqmLpeTWq8edkbSmYyYNe0lJrroURAAujOCIiKuzd6Uere94hAozE1ZBF5RpE9LVvUlnK/pub?gid=864724706&single=true&output=csv";
 
 function euro(n){return Number(n||0).toFixed(2)+" €"}
 function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).trim())}
@@ -110,10 +105,9 @@ function parseCSV(text){
 }
 
 let dataLoaded = false;
-let retryCount = 0;
-const MAX_RETRIES = 10;
 
 function render(payments, expenses){
+  // Вноски: Дете(0) | Сума(1) | Дарение(2) | Статус(3) | Дата(4)
   const paid = payments.filter(r=>isYes(r[3]));
   const income = paid.reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",", "."))||0),0);
   const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(r[2]).replace(",", "."))||0),0);
@@ -135,6 +129,7 @@ function render(payments, expenses){
     </tr>`
   }).join("");
 
+  // Разходи: Дата(0) | Разход(1) | Сума(2)
   document.getElementById("expensesTable").innerHTML=expenses.map(r=>`<tr>
     <td>${escapeHtml(r[0]||"")}</td><td>${escapeHtml(r[1]||"")}</td>
     <td>${euro(parseFloat(String(r[2]).replace(",","."))||0)}</td>
@@ -152,45 +147,21 @@ function render(payments, expenses){
 
 async function load(){
   if(dataLoaded) return;
-  
-  retryCount++;
-  document.getElementById("summary").innerHTML = `<p>🔄 Зареждане... (опит ${retryCount}/${MAX_RETRIES})</p>`;
-  
+  document.getElementById("summary").innerHTML = `<p>🔄 Зареждане...</p>`;
   try{
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    
     const [p,e]=await Promise.all([
-      fetch(PAYMENTS_CSV_URL, {signal: controller.signal}).then(r=>{
-        clearTimeout(timeout);
-        if(!r.ok) throw new Error('HTTP '+r.status);
-        return r.text();
-      }),
-      fetch(EXPENSES_CSV_URL, {signal: controller.signal}).then(r=>{
-        clearTimeout(timeout);
-        if(!r.ok) throw new Error('HTTP '+r.status);
-        return r.text();
-      })
+      fetch(PAYMENTS_CSV_URL).then(r=>r.text()),
+      fetch(EXPENSES_CSV_URL).then(r=>r.text())
     ]);
-    
     const payments=parseCSV(p).slice(1);
     const expenses=parseCSV(e).slice(1);
-    
     if(payments.length === 0 || expenses.length === 0) throw new Error('Празни данни');
-    
     render(payments,expenses);
-    
   }catch(err){
-    console.error('Грешка:', err);
-    if(retryCount < MAX_RETRIES){
-      const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
-      setTimeout(load, delay);
-    } else {
-      document.getElementById("summary").innerHTML = `<p style="color:#c62828">❌ Не успях след ${MAX_RETRIES} опита.</p>`;
-    }
+    console.error(err);
+    document.getElementById("summary").innerHTML = `<p style="color:#c62828">❌ Грешка: ${err.message}</p>`;
   }
 }
-
 load();
 </script>
 </body>
