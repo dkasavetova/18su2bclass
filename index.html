@@ -78,7 +78,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
 
 <script>
 const SHEET_ID = "1l_YKf6dAtY7aXTo76IuwTFENJ9LymvDm";
-const PROXY = "https://corsproxy.io/?";
+
+// НОВ PROXY:
+const PROXY = "https://thingsproxy.com/?url=";
 
 const timestamp = Date.now();
 const PAYMENTS_CSV_URL = PROXY + encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Вноски&ts=${timestamp}`);
@@ -114,7 +116,7 @@ const MAX_RETRIES = 10;
 function render(payments, expenses){
   const paid = payments.filter(r=>isYes(r[3]));
   const income = paid.reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",", "."))||0),0);
-  const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(r[2]).replace(",","."))||0),0);
+  const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(r[2]).replace(",", "."))||0),0);
   const balance=income-expenseTotal;
 
   document.getElementById("income").textContent=euro(income);
@@ -152,7 +154,7 @@ async function load(){
   if(dataLoaded) return;
   
   retryCount++;
-  document.getElementById("summary").innerHTML = `<p style="color:#6b7280">🔄 Зареждане... (опит ${retryCount}/${MAX_RETRIES})</p>`;
+  document.getElementById("summary").innerHTML = `<p>🔄 Зареждане... (опит ${retryCount}/${MAX_RETRIES})</p>`;
   
   try{
     const controller = new AbortController();
@@ -174,24 +176,17 @@ async function load(){
     const payments=parseCSV(p).slice(1);
     const expenses=parseCSV(e).slice(1);
     
-    if(payments.length === 0 || expenses.length === 0){
-      throw new Error('Празни данни');
-    }
+    if(payments.length === 0 || expenses.length === 0) throw new Error('Празни данни');
     
     render(payments,expenses);
     
   }catch(err){
-    console.error('Грешка при зареждане:', err);
-    
+    console.error('Грешка:', err);
     if(retryCount < MAX_RETRIES){
-      const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // exponential backoff
-      console.log(`Ще опитам пак след ${delay/1000} сек...`);
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
       setTimeout(load, delay);
     } else {
-      document.getElementById("summary").innerHTML = 
-        `<p style="color:#c62828">❌ Не успях да заредя данните след ${MAX_RETRIES} опита.</p>
-         <p style="color:#6b7280;font-size:13px">Провери връзката с интернет или опитай по-късно.<br>
-         <small>Грешка: ${err.message}</small></p>`;
+      document.getElementById("summary").innerHTML = `<p style="color:#c62828">❌ Не успях след ${MAX_RETRIES} опита.</p>`;
     }
   }
 }
