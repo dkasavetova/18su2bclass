@@ -77,7 +77,6 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
 </div>
 
 <script>
-// НОВИТЕ ЛИНКОВЕ:
 const PAYMENTS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_zaXIrcdTqmLpeTWq8edkbSmYyYNe0lJrroURAAujOCIiKuzd6Uere94hAozE1ZBF5RpE9LVvUlnK/pub?gid=0&single=true&output=csv";
 const EXPENSES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_zaXIrcdTqmLpeTWq8edkbSmYyYNe0lJrroURAAujOCIiKuzd6Uere94hAozE1ZBF5RpE9LVvUlnK/pub?gid=864724706&single=true&output=csv";
 
@@ -86,60 +85,45 @@ function isYes(v){return /^(да|yes|true|1|платено)$/i.test(String(v).tr
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
 function parseCSV(text){
-  const rows=[]; let row=[], cell="", quote=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i], n=text[i+1];
-    if(c === '"' && quote && n === '"'){cell+='"';i++;continue}
-    if(c === '"'){quote=!quote;continue}
-    if(c === ',' && !quote){row.push(cell.trim());cell="";continue}
-    if((c === '\n' || c === '\r') && !quote){
-      if(c==='\r' && n==='\n') i++;
-      row.push(cell.trim());cell="";
-      if(row.some(x=>x!=="")) rows.push(row);
-      row=[];continue;
-    }
-    cell+=c;
-  }
-  if(cell || row.length){row.push(cell.trim());if(row.some(x=>x!=="")) rows.push(row)}
-  return rows;
+  return text.trim().split('\n').map(line => 
+    line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
+  );
 }
 
 let dataLoaded = false;
 
 function render(payments, expenses){
-  // Вноски: Дете(0) | Сума(1) | Дарение(2) | Статус(3) | Дата(4)
-  const paid = payments.filter(r=>isYes(r[3]));
-  const income = paid.reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",", "."))||0),0);
+  // НОВА СТРУКТУРА: Превод(0) | Сума(1) | Дарение(2) | Дата(3)
+  // ВСИЧКИ СА ПЛАТИЛИ:
+  const income = payments.reduce((s,r)=>s+(parseFloat(String(r[1]).replace(",", "."))||0),0);
   const expenseTotal = expenses.reduce((s,r)=>s+(parseFloat(String(r[2]).replace(",", "."))||0),0);
   const balance=income-expenseTotal;
 
   document.getElementById("income").textContent=euro(income);
   document.getElementById("expenses").textContent=euro(expenseTotal);
   document.getElementById("balance").textContent=euro(balance);
-  document.getElementById("paidCount").textContent=paid.length+" / "+payments.length;
+  document.getElementById("paidCount").textContent=payments.length+" / "+payments.length;
 
   document.getElementById("payments").innerHTML=payments.map(r=>{
-    const p=isYes(r[3]);
     return `<tr>
       <td>${escapeHtml(r[0]||"")}</td>
       <td>${euro(parseFloat(String(r[1]).replace(",","."))||0)}</td>
       <td>${isYes(r[2])?'<span class="yes">Да</span>':'<span class="no">Не</span>'}</td>
-      <td><span class="badge ${p?'paid':'unpaid'}">${p?'Платено':'Неплатено'}</span></td>
-      <td>${escapeHtml(r[4]||"—")}</td>
+      <td><span class="badge paid">Платено</span></td>
+      <td>${escapeHtml(r[3]||"—")}</td>
     </tr>`
   }).join("");
 
-  // Разходи: Дата(0) | Разход(1) | Сума(2)
   document.getElementById("expensesTable").innerHTML=expenses.map(r=>`<tr>
     <td>${escapeHtml(r[0]||"")}</td><td>${escapeHtml(r[1]||"")}</td>
     <td>${euro(parseFloat(String(r[2]).replace(",","."))||0)}</td>
   </tr>`).join("");
 
+  const withDonation = payments.filter(r=>isYes(r[2])).length;
   document.getElementById("summary").innerHTML=
-    `<p>👥 Общо деца: <b>${payments.length}</b></p>
-     <p>✅ Платили: <b>${paid.length}</b></p>
-     <p>⏳ Неплатили: <b>${payments.length-paid.length}</b></p>
-     <p>💝 С включено дарение: <b>${paid.filter(r=>isYes(r[2])).length}</b></p>
+    `<p>👥 Общо вноски: <b>${payments.length}</b></p>
+     <p>✅ Всички платили: <b>${payments.length}</b></p>
+     <p>💝 С дарение: <b>${withDonation}</b></p>
      <p>💰 Наличност: <b>${euro(balance)}</b></p>`;
   document.getElementById("updated").textContent=new Date().toLocaleString("bg-BG");
   dataLoaded = true;
@@ -149,13 +133,18 @@ async function load(){
   if(dataLoaded) return;
   document.getElementById("summary").innerHTML = `<p>🔄 Зареждане...</p>`;
   try{
-    const [p,e]=await Promise.all([
+    const [pRaw, eRaw]=await Promise.all([
       fetch(PAYMENTS_CSV_URL).then(r=>r.text()),
       fetch(EXPENSES_CSV_URL).then(r=>r.text())
     ]);
-    const payments=parseCSV(p).slice(1);
-    const expenses=parseCSV(e).slice(1);
-    if(payments.length === 0 || expenses.length === 0) throw new Error('Празни данни');
+    
+    const payments=parseCSV(pRaw).slice(1);
+    const expenses=parseCSV(eRaw).slice(1);
+    
+    if(payments.length === 0 || expenses.length === 0){
+      throw new Error(`Празни данни! Вноски: ${payments.length}, Разходи: ${expenses.length}`);
+    }
+    
     render(payments,expenses);
   }catch(err){
     console.error(err);
